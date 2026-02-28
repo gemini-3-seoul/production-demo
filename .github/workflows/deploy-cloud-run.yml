@@ -6,13 +6,13 @@ on:
       - main
 
 env:
-  PROJECT_ID: 'your-gcp-project-id' # TODO: GCP 프로젝트 ID로 변경하세요
+  PROJECT_ID: 'project-035a75f4-af33-4445-a86' # TODO: GCP 프로젝트 ID로 변경하세요
   REGION: 'asia-northeast3'         # TODO: 배포할 리전 (예: 서울 리전)
   SERVICE_NAME: 'production-demo'   # TODO: Cloud Run 서비스 이름
   GAR_LOCATION: 'asia-northeast3'   # TODO: Artifact Registry 리전
-  REPOSITORY: 'my-repository'       # TODO: Artifact Registry 저장소 이름
+  REPOSITORY: 'product-demo'       # TODO: Artifact Registry 저장소 이름
   # WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider' # OIDC 사용시 필요
-  # SERVICE_ACCOUNT: 'my-service-account@my-project.iam.gserviceaccount.com'
+  SERVICE_ACCOUNT: 'product-demo-for-gemini-3--677@project-035a75f4-af33-4445-a86.iam.gserviceaccount.com'
 
 jobs:
   deploy:
