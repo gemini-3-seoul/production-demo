@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>소상공인 랜딩페이지 시스템 Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>🚀 BizPage AI</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-target="view-chat">💬 AI chat</button>
+                <button class="nav-btn" data-target="view-generator">✨ 가게소개페이지 만들기</button>
+
+                <div class="nav-section">
+                    <span class="section-title">📂 가게소개페이지들</span>
+                    <ul id="page-list" class="page-list">
+                        <!-- 저장된 페이지 목록이 이곳에 동적으로 추가됩니다 -->
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- View: AI Chat -->
+            <section id="view-chat" class="view-section active">
+                <div class="chat-wrapper">
+                    <div class="chat-header">
+                        <h2>AI 비서</h2>
+                        <p>시스템 내 기능들을 대화로 쉽게 이용해보세요.</p>
+                    </div>
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message ai-msg">
+                            안녕하세요! 사장님의 비즈니스를 돕는 ✨ <strong>제미나이 AI 비서</strong>입니다.<br><br>
+                            저와 대화하면서 아주 쉽게 가게소개페이지를 만드실 수 있습니다!<br><br>
+                            👉 <i>"우리 가게 랜딩페이지 만들어줘"</i> 라고 첫 마디를 건네보세요!
+                        </div>
+                    </div>
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chat-input" placeholder="메시지를 입력하세요...">
+                        <button id="chat-send">전송</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Generator (Iframe loading the separated app) -->
+            <section id="view-generator" class="view-section" style="padding: 0;">
+                <iframe src="landing-page-generator/index.html" id="generator-iframe" title="Generator Form"></iframe>
+            </section>
+
+            <!-- View: Preview -->
+            <section id="view-preview" class="view-section">
+                <div class="preview-header">
+                    <h2 id="preview-title">미리보기</h2>
+                    <button id="download-current-btn" class="btn-primary">⬇️ HTML 파일 다운로드</button>
+                </div>
+                <div class="iframe-wrapper">
+                    <iframe id="preview-iframe" title="landing page preview"></iframe>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

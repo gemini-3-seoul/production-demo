@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜딩페이지 생성기</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="generator-container">
+        <header class="text-center">
+            <h2>랜딩페이지 생성기</h2>
+            <p>소상공인 사장님을 위한 초간단 랜딩페이지 만들기</p>
+        </header>
+
+        <form id="generator-form">
+            <div class="form-group">
+                <label for="business-name">상호명 (가게 이름)</label>
+                <input type="text" id="business-name" placeholder="예: 맛있는 빵집" required>
+            </div>
+            <div class="form-group">
+                <label for="description">가게 소개 (인삿말)</label>
+                <textarea id="description" rows="3" placeholder="고객에게 전할 간단하고 친절한 인사말을 적어주세요!" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="address">가게 주소</label>
+                <input type="text" id="address" placeholder="예: 서울특별시 강남구 테헤란로 123" required>
+            </div>
+            <div class="form-group">
+                <label for="photo">대표 사진</label>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="photo" accept="image/*" required>
+                    <div class="file-upload-visual">
+                        <span id="file-name">클릭하여 가게 사진을 업로드하세요</span>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="generate-btn">
+                ✨ 마법처럼 랜딩페이지 만들기
+            </button>
+        </form>
+
+        <div id="result" class="result-area hidden">
+            <p id="success-message">✅ 랜딩페이지가 성공적으로 생성 및 자동 저장되었습니다!</p>
+            <p class="preview-hint">좌측 메뉴의 <strong>'📂 가게소개페이지들'</strong> 목록에서 확인하실 수 있습니다.</p>
+            <button id="reset-btn" class="secondary-btn">새로운 페이지 만들기</button>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>
