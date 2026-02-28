@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#grad)"/>
+  <rect x="60" y="70" width="960" height="210" rx="24" fill="rgba(255,255,255,0.2)"/>
+  <text x="90" y="120" fill="white" font-size="30" font-family="Arial" font-weight="700">BizPage AI 카드뉴스</text>
+  <text x="90" y="160" fill="white" font-size="38" font-family="Arial" font-weight="700">글링 카페 · null</text>
+  <text x="60" y="150" fill="white" font-size="44" font-weight="700">글링 카페만의 매력</text>
+  <text x="60" y="250" fill="#f8fafc" font-size="30">소셜 채널에서 바로 공유 가능한 짧은 문구로</text>
+<text x="60" y="284" fill="#f8fafc" font-size="30">구성된 카드뉴스입니다.</text>
+  <text x="60" y="530" fill="#a5f3fc" font-size="28">좋아요·저장·공유하고 고객과 만남을 더</text>
+<text x="60" y="564" fill="#a5f3fc" font-size="28">늘려보세요.</text>
+  <rect x="90" y="860" width="900" height="120" rx="24" fill="rgba(15,23,42,0.4)"/>
+  <text x="120" y="915" fill="#f8fafc" font-size="30" font-family="Arial">이미지 3/3</text>
+  <text x="120" y="955" fill="#bae6fd" font-size="34" font-weight="700" font-family="Arial">글링 카페</text>
+</svg>
