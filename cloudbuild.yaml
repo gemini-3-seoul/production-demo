@@ -36,6 +36,8 @@ steps:
       - '--allow-unauthenticated'
       - '--service-account'
       - 'product-demo-for-gemini-3--677@project-035a75f4-af33-4445-a86.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'GCS_BUCKET_NAME=production-demo-landing-pages'
 
 # 이미지를 Artifact Registry에 저장
 images:

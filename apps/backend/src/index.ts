@@ -2,9 +2,11 @@ import express, { Request, Response } from 'express';
 import sqlite3 from 'sqlite3';
 import cors from 'cors';
 import path from 'path';
+import { generateLandingPageHTML } from './utils/templateGenerator';
+import { uploadLandingPageToGCS } from './services/storageService';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // base64 이미지를 위해 limit 증가
 app.use(cors());
 
 // Configure SQLite database
@@ -19,6 +21,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
             `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+        );
+
+        // Create landing_pages table
+        db.run(
+            `CREATE TABLE IF NOT EXISTS landing_pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        page_id TEXT UNIQUE NOT NULL,
+        business_name TEXT NOT NULL,
+        public_url TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`
         );
@@ -55,6 +68,66 @@ app.get('/api/users', (req: Request, res: Response) => {
         }
         res.json({ users: rows });
     });
+});
+
+// 랜딩페이지 생성 API
+app.post('/api/landing-pages', async (req: Request, res: Response) => {
+    try {
+        const { businessName, description, address, photoBase64 } = req.body;
+
+        // 필수 필드 검증
+        if (!businessName || !description || !address || !photoBase64) {
+            res.status(400).json({
+                error: 'Missing required fields',
+                required: ['businessName', 'description', 'address', 'photoBase64'],
+            });
+            return;
+        }
+
+        // base64 형식 검증
+        if (!photoBase64.startsWith('data:image/')) {
+            res.status(400).json({
+                error: 'photoBase64 must be in data:image/... format',
+            });
+            return;
+        }
+
+        // HTML 생성
+        const htmlContent = generateLandingPageHTML({
+            businessName,
+            description,
+            address,
+            photoBase64,
+        });
+
+        // GCS에 업로드
+        const { pageId, publicUrl } = await uploadLandingPageToGCS(htmlContent);
+
+        // DB에 메타데이터 저장 (선택사항)
+        db.run(
+            'INSERT INTO landing_pages (page_id, business_name, public_url, created_at) VALUES (?, ?, ?, ?)',
+            [pageId, businessName, publicUrl, new Date().toISOString()],
+            function (err) {
+                if (err) {
+                    console.error('Error saving to database:', err);
+                    // DB 저장 실패해도 GCS 업로드는 성공했으므로 계속 진행
+                }
+            }
+        );
+
+        res.status(201).json({
+            success: true,
+            pageId,
+            url: publicUrl,
+            message: 'Landing page created successfully',
+        });
+    } catch (error) {
+        console.error('Error creating landing page:', error);
+        res.status(500).json({
+            error: 'Failed to create landing page',
+            details: error instanceof Error ? error.message : 'Unknown error',
+        });
+    }
 });
 
 // Listen on port 8081 for backend, 
