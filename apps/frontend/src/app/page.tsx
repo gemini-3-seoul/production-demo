@@ -327,9 +327,14 @@ export default function Dashboard() {
     }
   }, []);
 
-  // Save to local storage on change
+  // Save to local storage on change (photoBase64, html 제외 - 용량 초과 방지)
   useEffect(() => {
-    localStorage.setItem('bizPages', JSON.stringify(savedPages));
+    try {
+      const lightweight = savedPages.map(({ photoBase64, html, ...rest }) => rest);
+      localStorage.setItem('bizPages', JSON.stringify(lightweight));
+    } catch (e) {
+      console.warn('localStorage save failed (quota exceeded):', e);
+    }
   }, [savedPages]);
 
   // Scroll to bottom of chat
