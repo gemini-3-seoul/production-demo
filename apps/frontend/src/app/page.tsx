@@ -606,7 +606,11 @@ export default function Dashboard() {
 
   // Apply Proposal Handler
   const handleApplyProposal = async () => {
-    if (!editSelectedPage || !trendProposal || !editSelectedPage.gcsUrl) return;
+    if (!editSelectedPage || !trendProposal) return;
+    if (!editSelectedPage.gcsUrl) {
+      setEditError('배포된 페이지만 수정할 수 있습니다. 먼저 페이지를 배포해주세요.');
+      return;
+    }
     setIsApplyingChanges(true);
     setEditError(null);
 

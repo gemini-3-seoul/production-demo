@@ -517,8 +517,8 @@ app.post('/api/landing-pages', async (req: Request, res: Response) => {
         // GCS에 업로드
         const { pageId, publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent);
 
-        // DB에 메타데이터 저장
-        db.run(
+        // DB에 메타데이터 저장 (await로 완료 보장)
+        await dbRun(
             `INSERT INTO landing_pages
              (page_id, business_name, description, address, public_url, file_location, created_at, created_date, weather_snapshot, trend_snapshot)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -534,11 +534,6 @@ app.post('/api/landing-pages', async (req: Request, res: Response) => {
                 weatherResult ? JSON.stringify(weatherResult) : null,
                 trendResult ? JSON.stringify(trendResult) : null,
             ],
-            function (err) {
-                if (err) {
-                    console.error('Error saving to database:', err);
-                }
-            },
         );
 
         res.status(201).json({
@@ -674,7 +669,7 @@ ${trendKeywordsText}
                         const proposal = JSON.parse(jsonStr);
                         res.json({ success: true, proposal });
                     } catch {
-                        res.json({ success: true, proposal: { raw: fullText } });
+                        res.status(500).json({ success: false, error: 'AI 응답을 파싱할 수 없습니다. 다시 시도해주세요.', raw: fullText });
                     }
                 } else {
                     res.status(500).json({ error: 'No text response from Gemini' });
@@ -980,28 +975,18 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
             const { publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
             const updatedAt = new Date().toISOString();
 
-            db.run(
+            await dbRun(
                 `UPDATE landing_pages
                  SET business_name = ?, description = ?, address = ?, public_url = ?, file_location = ?, updated_at = ?
                  WHERE page_id = ?`,
                 [businessName, description, address, publicUrl, fileLocation, updatedAt, pageId],
-                function (err) {
-                    if (err) {
-                        console.error('Error updating database:', err);
-                        res.status(500).json({ error: 'Failed to update database record', details: err.message });
-                        return;
-                    }
-                    if (this.changes === 0) {
-                        res.status(404).json({ error: 'landing page not found' });
-                        return;
-                    }
-                    res.json({
-                        success: true, pageId, url: publicUrl,
-                        heroImageUrl: heroImageUrl ? 'generated' : null,
-                        updatedAt, message: 'Landing page updated successfully',
-                    });
-                },
             );
+
+            res.json({
+                success: true, pageId, url: publicUrl,
+                heroImageUrl: heroImageUrl ? 'generated' : null,
+                updatedAt, message: 'Landing page updated successfully',
+            });
         } else {
             // photoBase64 없음 → 기존 HTML에서 사진 추출 후 HTML 재생성
             const existing = await dbGet(
@@ -1017,7 +1002,7 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
             if (existing.file_location) {
                 const existingHtml = await readStoredFile(existing.file_location);
                 if (existingHtml) {
-                    const imgMatch = existingHtml.match(/<img\s+src="(data:image\/[^"]+)"/);
+                    const imgMatch = existingHtml.match(/<img[^>]*\ssrc="(data:image\/[^"]+)"/i);
                     extractedPhoto = imgMatch ? imgMatch[1] : null;
                 }
             }
@@ -1058,28 +1043,18 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
             const { publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
             const updatedAt = new Date().toISOString();
 
-            db.run(
+            await dbRun(
                 `UPDATE landing_pages
                  SET business_name = ?, description = ?, address = ?, public_url = ?, file_location = ?, updated_at = ?
                  WHERE page_id = ?`,
                 [businessName, description, address, publicUrl, fileLocation, updatedAt, pageId],
-                function (err) {
-                    if (err) {
-                        console.error('Error updating database:', err);
-                        res.status(500).json({ error: 'Failed to update database record', details: err.message });
-                        return;
-                    }
-                    if (this.changes === 0) {
-                        res.status(404).json({ error: 'landing page not found' });
-                        return;
-                    }
-                    res.json({
-                        success: true, pageId, url: publicUrl,
-                        heroImageUrl: heroImageUrl ? 'generated' : null,
-                        updatedAt, message: 'Landing page updated successfully',
-                    });
-                },
             );
+
+            res.json({
+                success: true, pageId, url: publicUrl,
+                heroImageUrl: heroImageUrl ? 'generated' : null,
+                updatedAt, message: 'Landing page updated successfully',
+            });
         }
     } catch (error) {
         console.error('Error updating landing page:', error);
