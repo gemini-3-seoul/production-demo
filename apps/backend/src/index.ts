@@ -130,7 +130,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 // 랜딩페이지 생성 API
 app.post('/api/landing-pages', async (req: Request, res: Response) => {
     try {
-        const { businessName, description, address, photoBase64 } = req.body;
+        const { businessName, description, address, photoBase64, imageAnalysis } = req.body;
 
         // 필수 필드 검증
         if (!businessName || !description || !address || !photoBase64) {
@@ -155,6 +155,7 @@ app.post('/api/landing-pages', async (req: Request, res: Response) => {
             description,
             address,
             photoBase64,
+            imageAnalysis,
         });
 
         // GCS에 업로드

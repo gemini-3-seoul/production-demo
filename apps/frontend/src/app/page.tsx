@@ -3,6 +3,18 @@
 import { useState, useEffect, useRef } from "react";
 
 // Types
+interface ImageAnalysis {
+  atmosphere: string[];
+  menuFeatures: string[];
+  colorScheme: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+  enhancedDescription: string;
+  tags: string[];
+}
+
 interface PageData {
   id: string;
   filename: string;
@@ -12,6 +24,7 @@ interface PageData {
   address?: string;
   photoBase64?: string;
   gcsUrl?: string;
+  imageAnalysis?: ImageAnalysis;
 }
 
 interface ChatMessage {
@@ -81,6 +94,175 @@ const generateStaticHtml = (businessName: string, description: string, address: 
 </html>`;
 };
 
+// Enhanced HTML Template with Gemini Analysis
+const generateEnhancedHtml = (
+  businessName: string,
+  description: string,
+  address: string,
+  b64Image: string,
+  analysis: ImageAnalysis
+) => {
+  const encodedAddress = encodeURIComponent(address);
+  const { atmosphere, menuFeatures, colorScheme, enhancedDescription, tags } = analysis;
+  const primaryColor = colorScheme?.primary || '#4CAF50';
+  const secondaryColor = colorScheme?.secondary || '#2196F3';
+  const accentColor = colorScheme?.accent || '#FF9800';
+
+  const atmosphereBadges = atmosphere?.length
+    ? `<div class="atmosphere-badges">${atmosphere.map(a => `<span class="atmosphere-badge">${a}</span>`).join('')}</div>`
+    : '';
+
+  const tagsHtml = tags?.length
+    ? `<div class="tags-section">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>`
+    : '';
+
+  const featuresHtml = menuFeatures?.length
+    ? `<div class="features-section">
+        <div class="features-title">이런 점이 특별해요</div>
+        <ul class="features-list">${menuFeatures.map(f => `<li>${f}</li>`).join('')}</ul>
+      </div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="${businessName} - ${enhancedDescription || description}">
+    <title>${businessName} - 환영합니다!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary-color: ${primaryColor}; --secondary-color: ${secondaryColor}; --accent-color: ${accentColor}; --text-main: #333333; --text-muted: #666666; --bg-color: #f7f9fc; --card-bg: #ffffff; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-color); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .hero { width: 100%; height: 450px; position: relative; overflow: hidden; }
+        .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .hero-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.75)); padding: 50px 20px 25px; color: white; text-align: center; }
+        .hero-overlay h1 { font-size: 2.8rem; text-shadow: 2px 2px 8px rgba(0,0,0,0.6); margin-bottom: 8px; }
+        .atmosphere-badges { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+        .atmosphere-badge { background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 6px 16px; border-radius: 20px; font-size: 0.9rem; color: white; border: 1px solid rgba(255,255,255,0.3); }
+        .container { max-width: 800px; margin: -50px auto 40px; padding: 0 20px; position: relative; z-index: 10; }
+        .card { background: var(--card-bg); border-radius: 20px; padding: 45px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); text-align: center; }
+        .enhanced-desc { font-size: 1.3rem; color: var(--text-main); margin-bottom: 30px; line-height: 1.8; white-space: pre-wrap; }
+        .tags-section { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-bottom: 30px; }
+        .tag { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; padding: 6px 14px; border-radius: 15px; font-size: 0.85rem; font-weight: 500; }
+        .features-section { background: linear-gradient(135deg, ${primaryColor}08, ${secondaryColor}08); border-radius: 16px; padding: 30px; margin-bottom: 30px; text-align: left; }
+        .features-title { font-size: 1.2rem; font-weight: 700; color: var(--primary-color); margin-bottom: 15px; text-align: center; }
+        .features-list { list-style: none; display: grid; gap: 12px; }
+        .features-list li { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; color: var(--text-main); }
+        .features-list li::before { content: ''; width: 8px; height: 8px; background: var(--accent-color); border-radius: 50%; flex-shrink: 0; }
+        .divider { height: 1px; background: linear-gradient(to right, transparent, #ddd, transparent); margin: 30px 0; }
+        .address-section { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .address-text { font-size: 1.2rem; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .map-btn { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; text-decoration: none; padding: 14px 32px; border-radius: 30px; font-size: 1.1rem; font-weight: 700; transition: transform 0.2s; box-shadow: 0 4px 15px ${primaryColor}40; }
+        .map-btn:hover { transform: translateY(-2px); }
+        footer { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 0.95rem; }
+        @media (max-width: 600px) { .hero { height: 300px; } .hero-overlay h1 { font-size: 2rem; } .card { padding: 30px 20px; } .map-btn { width: 100%; justify-content: center; } }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <img src="${b64Image}" alt="${businessName} 매장 사진">
+        <div class="hero-overlay">
+            <h1>${businessName}</h1>
+            ${atmosphereBadges}
+        </div>
+    </div>
+    <div class="container">
+        <div class="card">
+            <div class="enhanced-desc">${enhancedDescription || description}</div>
+            ${tagsHtml}
+            ${featuresHtml}
+            <div class="divider"></div>
+            <div class="address-section">
+                <div class="address-text">📍 ${address}</div>
+                <a href="https://www.google.com/maps/search/?api=1&query=${encodedAddress}" class="map-btn" target="_blank">🗺️ 구글 맵에서 위치 보기</a>
+            </div>
+        </div>
+    </div>
+    <footer>&copy; ${new Date().getFullYear()} ${businessName}</footer>
+</body>
+</html>`;
+};
+
+// Gemini Multimodal Image Analysis
+const analyzeImageWithGemini = async (
+  b64Image: string,
+  businessName: string,
+  description: string,
+  address: string
+): Promise<ImageAnalysis | null> => {
+  try {
+    const match = b64Image.match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if (!match) return null;
+    const [, mimeType, pureBase64] = match;
+
+    const analysisPrompt = `당신은 매장 사진을 분석하는 전문가입니다.
+아래 매장 정보와 사진을 분석하여 JSON 형식으로 결과를 반환해주세요.
+
+매장 정보:
+- 상호명: ${businessName}
+- 소개: ${description}
+- 주소: ${address}
+
+사진을 분석하여 아래 JSON 형식으로만 응답해주세요. 다른 텍스트 없이 JSON만 출력하세요:
+\`\`\`json
+{
+  "atmosphere": ["분위기 키워드1", "분위기 키워드2", "분위기 키워드3"],
+  "menuFeatures": ["이 매장의 특징/장점 1", "특징/장점 2", "특징/장점 3"],
+  "colorScheme": {
+    "primary": "#사진의 주요 색상 hex",
+    "secondary": "#보조 색상 hex",
+    "accent": "#강조 색상 hex"
+  },
+  "enhancedDescription": "사진과 매장정보를 기반으로 마케팅적으로 향상된 소개문구 (2-3문장)",
+  "tags": ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4", "#해시태그5"]
+}
+\`\`\``;
+
+    const contents = [{
+      role: "user",
+      parts: [
+        { text: analysisPrompt },
+        { inlineData: { mimeType, data: pureBase64 } }
+      ]
+    }];
+
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents })
+    });
+
+    if (!response.ok) throw new Error(`Analysis API Error: ${response.status}`);
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const parsed = JSON.parse(line.slice(6));
+          fullText += parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        } catch { /* incomplete chunk */ }
+      }
+    }
+
+    const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
+    const jsonStr = jsonMatch ? jsonMatch[1] : fullText;
+    return JSON.parse(jsonStr) as ImageAnalysis;
+  } catch (error) {
+    console.error('Image analysis error:', error);
+    return null;
+  }
+};
+
 export default function Dashboard() {
   const [activeView, setActiveView] = useState('view-chat');
   const [savedPages, setSavedPages] = useState<PageData[]>([]);
@@ -89,6 +271,7 @@ export default function Dashboard() {
   // Chat State
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([{
     id: 'welcome',
     sender: 'ai',
@@ -259,17 +442,51 @@ export default function Dashboard() {
     }
   };
 
-  const handleChatPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, pageDataStr: string) => {
+  const handleChatPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, pageDataStr: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const pageData = JSON.parse(pageDataStr);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const b64 = event.target?.result as string;
-      const htmlStr = generateStaticHtml(pageData.businessName, pageData.description, pageData.address, b64);
-      const filename = `가게소개페이지-${formatDate(new Date())}.html`;
+    setIsAnalyzing(true);
 
+    const analyzingMsgId = `analyzing-${Date.now()}`;
+    setChatMessages(prev => [...prev, {
+      id: analyzingMsgId,
+      sender: 'ai' as const,
+      text: '📸 사진을 분석하고 있습니다... Gemini AI가 매장 분위기, 메뉴 특징, 컬러 테마를 파악하고 있어요!',
+      isHtml: false
+    }]);
+
+    const fileReader = new FileReader();
+    fileReader.onload = async (event) => {
+      const b64 = event.target?.result as string;
+
+      const analysis = await analyzeImageWithGemini(
+        b64, pageData.businessName, pageData.description, pageData.address
+      );
+
+      let htmlStr: string;
+      if (analysis) {
+        setChatMessages(prev => prev.map(msg => msg.id === analyzingMsgId ? {
+          ...msg,
+          text: `✨ <strong>AI 사진 분석 완료!</strong><br><br>` +
+            (analysis.atmosphere?.length ? `<strong>분위기:</strong> ${analysis.atmosphere.join(', ')}<br>` : '') +
+            (analysis.tags?.length ? `<strong>태그:</strong> ${analysis.tags.join(' ')}<br>` : '') +
+            (analysis.menuFeatures?.length ? `<strong>특징:</strong> ${analysis.menuFeatures.join(', ')}<br>` : '') +
+            `<br>분석 결과를 반영한 향상된 랜딩페이지를 생성합니다!`,
+          isHtml: true
+        } : msg));
+        htmlStr = generateEnhancedHtml(pageData.businessName, pageData.description, pageData.address, b64, analysis);
+      } else {
+        setChatMessages(prev => prev.map(msg => msg.id === analyzingMsgId ? {
+          ...msg,
+          text: '⚠️ 사진 분석에 실패했습니다. 기본 템플릿으로 랜딩페이지를 생성합니다.',
+          isHtml: false
+        } : msg));
+        htmlStr = generateStaticHtml(pageData.businessName, pageData.description, pageData.address, b64);
+      }
+
+      const filename = `가게소개페이지-${formatDate(new Date())}.html`;
       addPage({
         id: Date.now().toString(),
         filename,
@@ -278,9 +495,12 @@ export default function Dashboard() {
         description: pageData.description,
         address: pageData.address,
         photoBase64: b64,
+        imageAnalysis: analysis || undefined,
       });
+
+      setIsAnalyzing(false);
     };
-    reader.readAsDataURL(file);
+    fileReader.readAsDataURL(file);
   };
 
   // Generator Logic
@@ -321,6 +541,7 @@ export default function Dashboard() {
           description: page.description,
           address: page.address,
           photoBase64: page.photoBase64,
+          imageAnalysis: page.imageAnalysis,
         }),
       });
 
@@ -400,6 +621,7 @@ export default function Dashboard() {
                         <input
                           type="file"
                           accept="image/*"
+                          disabled={isAnalyzing}
                           style={{ display: 'block', marginBottom: '10px', width: '100%', color: 'white' }}
                           onChange={(e) => handleChatPhotoUpload(e, msg.text)}
                         />
