@@ -285,6 +285,7 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState('view-chat');
   const [savedPages, setSavedPages] = useState<PageData[]>([]);
   const [currentPreview, setCurrentPreview] = useState<PageData | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Chat State
   const [chatInput, setChatInput] = useState('');
@@ -682,29 +683,48 @@ export default function Dashboard() {
     }
   };
 
+  // 네비게이션 클릭 시 모바일에서 사이드바 닫기
+  const handleNavClick = (view: string, extra?: () => void) => {
+    setActiveView(view);
+    extra?.();
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-container">
+      {/* Mobile Header */}
+      <header className="mobile-header">
+        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
+          <span /><span /><span />
+        </button>
+        <h2>🚀 BizPage AI</h2>
+      </header>
+
+      {/* Sidebar Overlay */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <h2>🚀 BizPage AI</h2>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
         <nav className="sidebar-nav">
           <button
             className={`nav-btn ${activeView === 'view-chat' ? 'active' : ''}`}
-            onClick={() => setActiveView('view-chat')}
+            onClick={() => handleNavClick('view-chat')}
           >
             📝 내 페이지 생성
           </button>
           <button
             className={`nav-btn ${activeView === 'view-generator' ? 'active' : ''}`}
-            onClick={() => { setActiveView('view-generator'); setGenStatus('idle'); }}
+            onClick={() => handleNavClick('view-generator', () => setGenStatus('idle'))}
           >
             ✨ 가게소개페이지 만들기
           </button>
           <button
             className={`nav-btn ${activeView === 'view-edit' ? 'active' : ''}`}
-            onClick={() => { setActiveView('view-edit'); setTrendProposal(null); setEditError(null); }}
+            onClick={() => handleNavClick('view-edit', () => { setTrendProposal(null); setEditError(null); })}
           >
             🔄 내 페이지 수정
           </button>
@@ -719,6 +739,7 @@ export default function Dashboard() {
                   onClick={() => {
                     setCurrentPreview(page);
                     setActiveView('view-preview');
+                    setSidebarOpen(false);
                   }}
                 >
                   📄 {page.filename}

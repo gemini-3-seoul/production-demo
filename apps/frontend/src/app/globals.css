@@ -748,3 +748,285 @@ body {
   color: #fbcfe8;
   font-weight: 500;
 }
+
+/* ============ Mobile Header ============ */
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: var(--sidebar-bg);
+  border-bottom: 1px solid var(--brand-border);
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 100;
+}
+
+.mobile-header h2 {
+  font-size: 1.15rem;
+  background: linear-gradient(to right, #a5b4fc, #fbcfe8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.mobile-menu-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px;
+}
+
+.mobile-menu-btn span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--text-color);
+  border-radius: 2px;
+  transition: transform 0.2s;
+}
+
+.sidebar-close-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 199;
+}
+
+/* ============ Mobile Responsive ============ */
+@media (max-width: 768px) {
+  /* Mobile header 표시 */
+  .mobile-header {
+    display: flex;
+  }
+
+  .sidebar-close-btn {
+    display: block;
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  /* 앱 컨테이너 세로 배치 */
+  .app-container {
+    flex-direction: column;
+    padding-top: 56px;
+  }
+
+  /* 사이드바 오버레이 모드 */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* 메인 콘텐츠 전체 너비 */
+  .main-content {
+    width: 100%;
+    min-height: 0;
+  }
+
+  /* 뷰 패딩 축소 */
+  .view-section {
+    padding: 16px;
+  }
+
+  /* 채팅 뷰 */
+  .chat-wrapper {
+    border-radius: 0;
+    border: none;
+    height: 100%;
+  }
+
+  .chat-header {
+    padding: 14px 16px;
+  }
+
+  .chat-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .chat-messages {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .message {
+    max-width: 90%;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+  }
+
+  .chat-input-wrapper {
+    padding: 10px 12px 14px;
+    gap: 8px;
+  }
+
+  .chat-input-wrapper input {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+
+  .chat-input-wrapper button {
+    padding: 0 16px;
+    font-size: 0.9rem;
+  }
+
+  .chat-suggestions {
+    padding: 10px 12px 0;
+  }
+
+  .suggestion-btn {
+    font-size: 0.8rem;
+    padding: 7px 14px;
+  }
+
+  /* 생성기 뷰 */
+  .generator-container {
+    padding: 1.5rem 1.2rem;
+    border-radius: 16px;
+    box-shadow: none;
+    border: none;
+  }
+
+  .text-center h2 {
+    font-size: 1.5rem;
+  }
+
+  .form-group input[type="text"],
+  .form-group textarea {
+    padding: 0.8rem;
+    font-size: 0.95rem;
+  }
+
+  .generate-btn,
+  .secondary-btn {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+
+  /* 미리보기 뷰 */
+  .preview-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .preview-header h2 {
+    font-size: 1.1rem;
+    word-break: break-all;
+  }
+
+  .preview-actions {
+    width: 100%;
+  }
+
+  .btn-primary {
+    padding: 0.7rem 1rem;
+    font-size: 0.9rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .iframe-wrapper {
+    min-height: 300px;
+    border-width: 2px;
+    border-radius: 8px;
+  }
+
+  /* 수정 뷰 */
+  .edit-container {
+    max-width: 100%;
+  }
+
+  .edit-container h2 {
+    font-size: 1.3rem;
+  }
+
+  .edit-select {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+
+  .proposal-card {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .proposal-section-title {
+    font-size: 1rem;
+  }
+
+  .proposal-keyword {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+  }
+
+  .proposal-tag {
+    padding: 3px 10px;
+    font-size: 0.78rem;
+  }
+
+  .proposal-insight {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+}
+
+/* ============ Small Mobile (< 400px) ============ */
+@media (max-width: 400px) {
+  .view-section {
+    padding: 10px;
+  }
+
+  .message {
+    max-width: 95%;
+  }
+
+  .generator-container {
+    padding: 1.2rem 1rem;
+  }
+
+  .text-center h2 {
+    font-size: 1.3rem;
+  }
+}
