@@ -1,0 +1,49 @@
+steps:
+  # 1. Docker 이미지 빌드
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:$COMMIT_SHA'
+      - '-t'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:latest'
+      - '.'
+
+  # 2. Artifact Registry에 이미지 푸시
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:latest'
+
+  # 3. Cloud Run에 배포
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'production-demo'
+      - '--image'
+      - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:$COMMIT_SHA'
+      - '--region'
+      - 'asia-northeast3'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--service-account'
+      - 'product-demo-for-gemini-3--677@project-035a75f4-af33-4445-a86.iam.gserviceaccount.com'
+
+# 이미지를 Artifact Registry에 저장
+images:
+  - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:$COMMIT_SHA'
+  - 'asia-northeast3-docker.pkg.dev/$PROJECT_ID/product-demo/production-demo:latest'
+
+# 빌드 타임아웃 설정 (기본 10분)
+timeout: '1200s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
