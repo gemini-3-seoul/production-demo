@@ -1,12 +1,13 @@
 {
-  "name": "production-demo",
-  "version": "1.0.0",
-  "description": "A simple demo app for Cloud Run",
-  "main": "src/index.js",
-  "scripts": {
-    "start": "node src/index.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2"
-  }
+    "name": "production-demo-monorepo",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "apps/*"
+    ],
+    "scripts": {
+        "dev": "npm run dev --workspaces --if-present",
+        "build": "npm run build --workspaces --if-present",
+        "start": "node start.js"
+    }
 }

@@ -1,14 +1,11 @@
 node_modules
 apps/*/node_modules
-npm-debug.log
-.git
-.github
-Dockerfile
+.DS_Store
 
-# Frontend build cache
+# Frontend
 apps/frontend/.next
 apps/frontend/out
 
-# Backend build cache
+# Backend
 apps/backend/dist
 apps/backend/*.sqlite

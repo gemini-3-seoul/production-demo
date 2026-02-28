@@ -1,22 +1,33 @@
-# Use the official lightweight Node.js 24 LTS image.
-# https://hub.docker.com/_/node
 FROM node:24-slim
 
-# Create and change to the app directory.
-WORKDIR /usr/src/app
+# SQLite typically needs python and build basics if prebuilt binaries are not available
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-# Copy application dependency manifests to the container image.
-# A wildcard is used to ensure both package.json AND package-lock.json are copied.
-# Copying this separately prevents re-running npm install on every code change.
+WORKDIR /app
+
+# Copy workspace configs and install deps
 COPY package*.json ./
+COPY start.js ./
+COPY apps/frontend/package*.json apps/frontend/
+COPY apps/backend/package*.json apps/backend/
 
-# Install dependencies.
-# If you add a package-lock.json, speed your build by switching to 'npm ci'.
-# RUN npm ci --only=production
 RUN npm install
 
-# Copy local code to the container image.
-COPY . ./
+# Copy source codes
+COPY . .
 
-# Run the web service on container startup.
-CMD [ "npm", "start" ]
+# Build Backend
+RUN npm run build -w apps/backend
+
+# Build Frontend
+# Disable Next.js telemetry
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build -w apps/frontend
+
+# Expose port (Cloud Run sets PORT to 8080 by default)
+ENV PORT=8080
+ENV API_PORT=8081
+EXPOSE 8080 8081
+
+# Run the wrapper script that spawns both apps
+CMD ["node", "start.js"]
