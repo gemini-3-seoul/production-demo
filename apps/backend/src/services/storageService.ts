@@ -162,6 +162,35 @@ export function getPublicUrl(fileLocation: string): string {
 }
 
 /**
+ * 저장된 HTML 파일 읽기
+ */
+export async function readStoredFile(fileLocation: string): Promise<string | null> {
+    if (fileLocation.startsWith('gs://')) {
+        try {
+            const { Storage } = await import('@google-cloud/storage');
+            const storage = new Storage();
+            const pathWithoutScheme = fileLocation.replace('gs://', '');
+            const firstSlash = pathWithoutScheme.indexOf('/');
+            if (firstSlash === -1) return null;
+            const bucketName = pathWithoutScheme.slice(0, firstSlash);
+            const filePath = pathWithoutScheme.slice(firstSlash + 1);
+            const [content] = await storage.bucket(bucketName).file(filePath).download();
+            return content.toString('utf-8');
+        } catch (err) {
+            console.warn('Failed to read from GCS:', err);
+            return null;
+        }
+    }
+
+    // Local file
+    try {
+        return fs.readFileSync(fileLocation, 'utf-8');
+    } catch {
+        return null;
+    }
+}
+
+/**
  * 저장된 파일 삭제
  */
 export async function deleteStoredFile(fileLocation: string): Promise<void> {

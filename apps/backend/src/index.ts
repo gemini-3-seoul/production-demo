@@ -4,7 +4,7 @@ import sqlite3 from 'sqlite3';
 import cors from 'cors';
 import path from 'path';
 import { generateLandingPageHTML } from './utils/templateGenerator';
-import { uploadLandingPageToGCS, saveCardNewsAsset, getPublicUrl } from './services/storageService';
+import { uploadLandingPageToGCS, saveCardNewsAsset, getPublicUrl, readStoredFile } from './services/storageService';
 import { getWeather } from './services/weatherService';
 
 import { generateImage, buildCardNewsPrompt, buildHeroImagePrompt } from './services/imageGenerationService';
@@ -930,83 +930,157 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
         const { pageId } = req.params;
         const { businessName, description, address, photoBase64, imageAnalysis } = req.body;
 
-        if (!businessName || !description || !address || !photoBase64) {
+        if (!businessName || !description || !address) {
             res.status(400).json({
                 error: 'Missing required fields',
-                required: ['businessName', 'description', 'address', 'photoBase64'],
+                required: ['businessName', 'description', 'address'],
             });
             return;
         }
 
-        if (!photoBase64.startsWith('data:image/')) {
-            res.status(400).json({
-                error: 'photoBase64 must be in data:image/... format',
-            });
-            return;
-        }
-
-        // 히어로 이미지 생성 시도
-        let heroImageUrl: string | undefined;
-        if (GEMINI_API_KEY) {
-            try {
-                const heroPrompt = buildHeroImagePrompt(
-                    businessName,
-                    description,
-                    imageAnalysis?.atmosphere,
-                    imageAnalysis?.colorScheme,
-                );
-                const heroImage = await generateImage(heroPrompt, GEMINI_API_KEY);
-                const base64Data = heroImage.data.toString('base64');
-                heroImageUrl = `data:${heroImage.mimeType};base64,${base64Data}`;
-                console.log(`[Hero Image] Regenerated for ${businessName}`);
-            } catch (err) {
-                console.warn('[Hero Image] Regeneration failed, using original photo:', err);
-            }
-        }
-
-        // HTML 생성
-        const htmlContent = generateLandingPageHTML({
-            businessName,
-            description,
-            address,
-            photoBase64,
-            imageAnalysis,
-            heroImageUrl,
-        });
-
-        // GCS에 업로드 (기존 pageId로 덮어쓰기)
-        const { publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
-        const updatedAt = new Date().toISOString();
-
-        // DB UPDATE
-        db.run(
-            `UPDATE landing_pages
-             SET business_name = ?, description = ?, address = ?, public_url = ?, file_location = ?, updated_at = ?
-             WHERE page_id = ?`,
-            [businessName, description, address, publicUrl, fileLocation, updatedAt, pageId],
-            function (err) {
-                if (err) {
-                    console.error('Error updating database:', err);
-                    res.status(500).json({
-                        error: 'Failed to update database record',
-                        details: err.message,
-                    });
-                    return;
-                }
-                if (this.changes === 0) {
-                    res.status(404).json({ error: 'landing page not found' });
-                    return;
-                }
-                res.json({
-                    success: true,
-                    pageId,
-                    url: publicUrl,
-                    heroImageUrl: heroImageUrl ? 'generated' : null,
-                    updatedAt,
-                    message: 'Landing page updated successfully',
+        // photoBase64가 있으면 HTML 재생성, 없으면 메타데이터만 업데이트
+        if (photoBase64) {
+            if (!photoBase64.startsWith('data:image/')) {
+                res.status(400).json({
+                    error: 'photoBase64 must be in data:image/... format',
                 });
-            },
-        );
+                return;
+            }
+
+            // 히어로 이미지 생성 시도
+            let heroImageUrl: string | undefined;
+            if (GEMINI_API_KEY) {
+                try {
+                    const heroPrompt = buildHeroImagePrompt(
+                        businessName,
+                        description,
+                        imageAnalysis?.atmosphere,
+                        imageAnalysis?.colorScheme,
+                    );
+                    const heroImage = await generateImage(heroPrompt, GEMINI_API_KEY);
+                    const base64Data = heroImage.data.toString('base64');
+                    heroImageUrl = `data:${heroImage.mimeType};base64,${base64Data}`;
+                    console.log(`[Hero Image] Regenerated for ${businessName}`);
+                } catch (err) {
+                    console.warn('[Hero Image] Regeneration failed, using original photo:', err);
+                }
+            }
+
+            // HTML 생성
+            const htmlContent = generateLandingPageHTML({
+                businessName,
+                description,
+                address,
+                photoBase64,
+                imageAnalysis,
+                heroImageUrl,
+            });
+
+            // GCS에 업로드 (기존 pageId로 덮어쓰기)
+            const { publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
+            const updatedAt = new Date().toISOString();
+
+            db.run(
+                `UPDATE landing_pages
+                 SET business_name = ?, description = ?, address = ?, public_url = ?, file_location = ?, updated_at = ?
+                 WHERE page_id = ?`,
+                [businessName, description, address, publicUrl, fileLocation, updatedAt, pageId],
+                function (err) {
+                    if (err) {
+                        console.error('Error updating database:', err);
+                        res.status(500).json({ error: 'Failed to update database record', details: err.message });
+                        return;
+                    }
+                    if (this.changes === 0) {
+                        res.status(404).json({ error: 'landing page not found' });
+                        return;
+                    }
+                    res.json({
+                        success: true, pageId, url: publicUrl,
+                        heroImageUrl: heroImageUrl ? 'generated' : null,
+                        updatedAt, message: 'Landing page updated successfully',
+                    });
+                },
+            );
+        } else {
+            // photoBase64 없음 → 기존 HTML에서 사진 추출 후 HTML 재생성
+            const existing = await dbGet(
+                `SELECT file_location FROM landing_pages WHERE page_id = ?`,
+                [pageId],
+            );
+            if (!existing) {
+                res.status(404).json({ error: 'landing page not found' });
+                return;
+            }
+
+            let extractedPhoto: string | null = null;
+            if (existing.file_location) {
+                const existingHtml = await readStoredFile(existing.file_location);
+                if (existingHtml) {
+                    const imgMatch = existingHtml.match(/<img\s+src="(data:image\/[^"]+)"/);
+                    extractedPhoto = imgMatch ? imgMatch[1] : null;
+                }
+            }
+
+            if (!extractedPhoto) {
+                res.status(400).json({ error: 'Cannot regenerate HTML: original photo not found. Please re-upload the photo.' });
+                return;
+            }
+
+            // 히어로 이미지 생성 시도
+            let heroImageUrl: string | undefined;
+            if (GEMINI_API_KEY) {
+                try {
+                    const heroPrompt = buildHeroImagePrompt(
+                        businessName,
+                        description,
+                        imageAnalysis?.atmosphere,
+                        imageAnalysis?.colorScheme,
+                    );
+                    const heroImage = await generateImage(heroPrompt, GEMINI_API_KEY);
+                    const base64Data = heroImage.data.toString('base64');
+                    heroImageUrl = `data:${heroImage.mimeType};base64,${base64Data}`;
+                    console.log(`[Hero Image] Regenerated for ${businessName}`);
+                } catch (err) {
+                    console.warn('[Hero Image] Regeneration failed, using existing photo:', err);
+                }
+            }
+
+            const htmlContent = generateLandingPageHTML({
+                businessName,
+                description,
+                address,
+                photoBase64: extractedPhoto,
+                imageAnalysis,
+                heroImageUrl,
+            });
+
+            const { publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
+            const updatedAt = new Date().toISOString();
+
+            db.run(
+                `UPDATE landing_pages
+                 SET business_name = ?, description = ?, address = ?, public_url = ?, file_location = ?, updated_at = ?
+                 WHERE page_id = ?`,
+                [businessName, description, address, publicUrl, fileLocation, updatedAt, pageId],
+                function (err) {
+                    if (err) {
+                        console.error('Error updating database:', err);
+                        res.status(500).json({ error: 'Failed to update database record', details: err.message });
+                        return;
+                    }
+                    if (this.changes === 0) {
+                        res.status(404).json({ error: 'landing page not found' });
+                        return;
+                    }
+                    res.json({
+                        success: true, pageId, url: publicUrl,
+                        heroImageUrl: heroImageUrl ? 'generated' : null,
+                        updatedAt, message: 'Landing page updated successfully',
+                    });
+                },
+            );
+        }
     } catch (error) {
         console.error('Error updating landing page:', error);
         res.status(500).json({
