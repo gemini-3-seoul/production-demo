@@ -766,16 +766,16 @@ export default function Dashboard() {
                   if (msg.id.startsWith('upload-')) {
                     // Render Photo Upload Block
                     return (
-                      <div key={msg.id} className="message ai-msg" style={{ background: 'rgba(0,0,0,0.2)', border: '1px dashed var(--brand-primary)', width: '100%', maxWidth: '350px' }}>
-                        <p style={{ marginBottom: '10px', fontWeight: 'bold', color: '#4ade80' }}>✅ 가게 메인 사진만 남았습니다!</p>
+                      <div key={msg.id} className="message ai-msg" style={{ background: '#FFFFFF', border: '1px dashed #A78BFA', width: '100%', maxWidth: '350px' }}>
+                        <p style={{ marginBottom: '10px', fontWeight: 'bold', color: '#16a34a' }}>✅ 가게 메인 사진만 남았습니다!</p>
                         <input
                           type="file"
                           accept="image/*"
                           disabled={isAnalyzing}
-                          style={{ display: 'block', marginBottom: '10px', width: '100%', color: 'white' }}
+                          style={{ display: 'block', marginBottom: '10px', width: '100%', color: '#111827' }}
                           onChange={(e) => handleChatPhotoUpload(e, msg.text)}
                         />
-                        <p style={{ fontSize: '0.8rem', color: '#ccc' }}>사진을 선택하면 바로 최종 페이지가 생성됩니다.</p>
+                        <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>사진을 선택하면 바로 최종 페이지가 생성됩니다.</p>
                       </div>
                     );
                   }
@@ -947,7 +947,7 @@ export default function Dashboard() {
                       href={editSelectedPage.gcsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#a5b4fc', fontSize: '0.85rem', display: 'block', marginBottom: '16px' }}
+                      style={{ color: '#7C3AED', fontSize: '0.85rem', display: 'block', marginBottom: '16px' }}
                     >
                       🌐 현재 배포 URL: {editSelectedPage.gcsUrl}
                     </a>
@@ -965,7 +965,7 @@ export default function Dashboard() {
 
                   {/* 에러 메시지 */}
                   {editError && (
-                    <div style={{ color: '#f87171', padding: '12px', background: 'rgba(248,113,113,0.1)', borderRadius: '8px', marginBottom: '16px' }}>
+                    <div style={{ color: '#dc2626', padding: '12px', background: '#fef2f2', borderRadius: '8px', marginBottom: '16px', border: '1px solid #fecaca' }}>
                       ❌ {editError}
                     </div>
                   )}
