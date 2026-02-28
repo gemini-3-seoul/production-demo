@@ -5,6 +5,10 @@ npm-debug.log
 .github
 Dockerfile
 
+# Env files (secrets - Cloud Run uses env vars directly)
+**/.env
+**/.env.*
+
 # Frontend build cache
 apps/frontend/.next
 apps/frontend/out
