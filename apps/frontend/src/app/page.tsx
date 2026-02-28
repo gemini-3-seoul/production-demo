@@ -7,6 +7,11 @@ interface PageData {
   id: string;
   filename: string;
   html: string;
+  businessName?: string;
+  description?: string;
+  address?: string;
+  photoBase64?: string;
+  gcsUrl?: string;
 }
 
 interface ChatMessage {
@@ -127,14 +132,15 @@ export default function Dashboard() {
   const addPage = (page: PageData) => {
     setSavedPages([...savedPages, page]);
     setCurrentPreview(page);
+    setUploadStatus('idle');
     setActiveView('view-preview');
   };
 
   // Chat Logic
-  const handleChat = async () => {
-    if (!chatInput.trim() || isChatLoading) return;
+  const handleChat = async (directText?: string) => {
+    const text = (directText || chatInput).trim();
+    if (!text || isChatLoading) return;
 
-    const text = chatInput.trim();
     setChatInput('');
     setIsChatLoading(true);
 
@@ -171,42 +177,82 @@ export default function Dashboard() {
 
     conversationHistory.current.push({ role: "user", parts: [{ text: messageText }] });
 
+    const aiMsgId = Date.now().toString();
+    // 스트리밍 중 실시간으로 업데이트할 AI 메시지를 미리 추가
+    setChatMessages(prev => [...prev, { id: aiMsgId, sender: 'ai', text: '', isHtml: true }]);
+
     try {
-      const response = await fetch('http://localhost:3000/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: conversationHistory.current })
       });
 
       if (!response.ok) throw new Error(`Server Error: ${response.status}`);
-      const data = await response.json();
-      const aiText = data.candidates[0].content.parts[0].text;
 
-      conversationHistory.current.push({ role: "model", parts: [{ text: aiText }] });
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
 
-      const jsonMatch = aiText.match(/\`\`\`json\n([\s\S]*?)\n\`\`\`/);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        // SSE 형식 파싱: "data: {...}\n\n" 에서 JSON 추출
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6);
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const partText = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            fullText += partText;
+            // 실시간 메시지 업데이트
+            const displayText = fullText.replace(/```json\n[\s\S]*?```/g, '').replace(/\n/g, '<br/>');
+            setChatMessages(prev =>
+              prev.map(msg => msg.id === aiMsgId ? { ...msg, text: displayText } : msg)
+            );
+          } catch {
+            // 불완전한 JSON 청크는 무시
+          }
+        }
+      }
+
+      conversationHistory.current.push({ role: "model", parts: [{ text: fullText }] });
+
+      // 스트리밍 완료 후 JSON 블록 확인
+      const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/);
 
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[1]);
-        const displayMsg = aiText.replace(/\`\`\`json\n([\s\S]*?)\n\`\`\`/, '').replace(/\n/g, '<br/>');
+        const displayMsg = fullText.replace(/```json\n[\s\S]*?```/, '').replace(/\n/g, '<br/>');
 
-        setChatMessages(prev => [...prev, { id: Date.now().toString() + '1', sender: 'ai', text: displayMsg, isHtml: true }]);
+        // 최종 텍스트로 갱신
+        setChatMessages(prev =>
+          prev.map(msg => msg.id === aiMsgId ? { ...msg, text: displayMsg } : msg)
+        );
 
-        // Inject Photo upload UI
+        // 사진 업로드 UI 추가
         const uploadHtmlId = `upload-${Date.now()}`;
         setChatMessages(prev => [...prev, {
           id: uploadHtmlId,
           sender: 'ai',
-          text: JSON.stringify(parsed), // Using text to store pageData for special upload component
+          text: JSON.stringify(parsed),
           isHtml: false
         }]);
-
       } else {
-        setChatMessages(prev => [...prev, { id: Date.now().toString(), sender: 'ai', text: aiText.replace(/\n/g, '<br/>'), isHtml: true }]);
+        // 최종 텍스트 반영
+        setChatMessages(prev =>
+          prev.map(msg => msg.id === aiMsgId ? { ...msg, text: fullText.replace(/\n/g, '<br/>') } : msg)
+        );
       }
     } catch (e) {
       console.error(e);
-      setChatMessages(prev => [...prev, { id: Date.now().toString(), sender: 'ai', text: '❌ 통신 중 오류가 발생했습니다. 백엔드 서버(Proxy)가 실행중인지 확인해주세요.' }]);
+      setChatMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== aiMsgId);
+        return [...filtered, { id: Date.now().toString(), sender: 'ai', text: '❌ 통신 중 오류가 발생했습니다. 백엔드 서버(Proxy)가 실행중인지 확인해주세요.' }];
+      });
       conversationHistory.current.pop();
     } finally {
       setIsChatLoading(false);
@@ -224,7 +270,15 @@ export default function Dashboard() {
       const htmlStr = generateStaticHtml(pageData.businessName, pageData.description, pageData.address, b64);
       const filename = `가게소개페이지-${formatDate(new Date())}.html`;
 
-      addPage({ id: Date.now().toString(), filename, html: htmlStr });
+      addPage({
+        id: Date.now().toString(),
+        filename,
+        html: htmlStr,
+        businessName: pageData.businessName,
+        description: pageData.description,
+        address: pageData.address,
+        photoBase64: b64,
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -252,16 +306,36 @@ export default function Dashboard() {
     reader.readAsDataURL(genFile);
   };
 
-  const downloadHtml = (page: PageData) => {
-    const blob = new Blob([page.html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = page.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+
+  const handleUploadToGCS = async (page: PageData) => {
+    if (!page.businessName || !page.photoBase64) return;
+    setUploadStatus('uploading');
+
+    try {
+      const res = await fetch('/api/landing-pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: page.businessName,
+          description: page.description,
+          address: page.address,
+          photoBase64: page.photoBase64,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+      const data = await res.json();
+
+      // gcsUrl을 PageData에 저장
+      const updated = { ...page, gcsUrl: data.url };
+      setSavedPages(prev => prev.map(p => p.id === page.id ? updated : p));
+      setCurrentPreview(updated);
+      setUploadStatus('done');
+    } catch (e) {
+      console.error('GCS upload error:', e);
+      setUploadStatus('error');
+    }
   };
 
   return (
@@ -345,6 +419,17 @@ export default function Dashboard() {
                 )}
                 <div ref={messagesEndRef} />
               </div>
+              <div className="chat-input-area">
+                {chatMessages.length <= 1 && !isChatLoading && (
+                  <div className="chat-suggestions">
+                    <button
+                      className="suggestion-btn"
+                      onClick={() => handleChat('우리 가게 랜딩페이지 만들어줘')}
+                    >
+                      ✨ 우리 가게 랜딩페이지 만들어줘
+                    </button>
+                  </div>
+                )}
               <div className="chat-input-wrapper">
                 <input
                   type="text"
@@ -354,7 +439,8 @@ export default function Dashboard() {
                   placeholder="메시지를 입력하세요..."
                   disabled={isChatLoading}
                 />
-                <button onClick={handleChat} disabled={isChatLoading}>전송</button>
+                <button onClick={() => handleChat()} disabled={isChatLoading}>전송</button>
+              </div>
               </div>
             </div>
           </section>
@@ -420,9 +506,24 @@ export default function Dashboard() {
           <section className="view-section active">
             <div className="preview-header">
               <h2>미리보기: {currentPreview.filename}</h2>
-              <button className="btn-primary" onClick={() => downloadHtml(currentPreview)}>
-                ⬇️ HTML 파일 다운로드
-              </button>
+              <div className="preview-actions">
+                {currentPreview.gcsUrl ? (
+                  <a href={currentPreview.gcsUrl} target="_blank" rel="noopener noreferrer" className="btn-primary btn-success">
+                    🌐 배포된 페이지 열기
+                  </a>
+                ) : currentPreview.businessName ? (
+                  <button
+                    className="btn-primary"
+                    onClick={() => handleUploadToGCS(currentPreview)}
+                    disabled={uploadStatus === 'uploading'}
+                  >
+                    {uploadStatus === 'uploading' ? '⏳ 업로드 중...' : '🚀 웹에 배포하기'}
+                  </button>
+                ) : null}
+                {uploadStatus === 'error' && (
+                  <span className="upload-error">업로드 실패. 다시 시도해주세요.</span>
+                )}
+              </div>
             </div>
             <div className="iframe-wrapper">
               <iframe srcDoc={currentPreview.html} title="landing page preview" />
