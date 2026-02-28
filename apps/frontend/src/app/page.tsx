@@ -315,6 +315,7 @@ export default function Dashboard() {
   const [isAnalyzingTrends, setIsAnalyzingTrends] = useState(false);
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [trendKeywords, setTrendKeywords] = useState('');
 
   // Load from local storage on mount
   useEffect(() => {
@@ -560,6 +561,17 @@ export default function Dashboard() {
   // Trend Analysis Handler
   const handleAnalyzeTrends = async () => {
     if (!editSelectedPage) return;
+
+    const keywords = trendKeywords
+      .split(',')
+      .map(k => k.trim())
+      .filter(Boolean);
+
+    if (keywords.length === 0) {
+      setEditError('트렌드 키워드를 1개 이상 입력해주세요. (쉼표로 구분)');
+      return;
+    }
+
     setIsAnalyzingTrends(true);
     setEditError(null);
     setTrendProposal(null);
@@ -572,6 +584,7 @@ export default function Dashboard() {
           businessName: editSelectedPage.businessName,
           description: editSelectedPage.description,
           address: editSelectedPage.address,
+          trendKeywords: keywords,
         }),
       });
 
@@ -728,6 +741,13 @@ export default function Dashboard() {
           >
             🔄 내 페이지 수정
           </button>
+          <a
+            href="/card-news"
+            className="nav-btn"
+            style={{ textDecoration: 'none', display: 'block', textAlign: 'left' }}
+          >
+            🎴 카드뉴스
+          </a>
 
           <div className="nav-section">
             <span className="section-title">📂 가게소개페이지들</span>
@@ -952,6 +972,30 @@ export default function Dashboard() {
                       🌐 현재 배포 URL: {editSelectedPage.gcsUrl}
                     </a>
                   )}
+
+                  {/* 트렌드 키워드 입력 */}
+                  <div className="form-group" style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: 600, fontSize: '0.9rem' }}>
+                      트렌드 키워드 입력
+                    </label>
+                    <input
+                      type="text"
+                      value={trendKeywords}
+                      onChange={(e) => setTrendKeywords(e.target.value)}
+                      placeholder="예: 여름 음료, 빙수, 시원한 메뉴"
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid #d1d5db',
+                        fontSize: '0.95rem',
+                        outline: 'none',
+                      }}
+                    />
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '4px' }}>
+                      쉼표(,)로 구분하여 여러 키워드를 입력하세요.
+                    </p>
+                  </div>
 
                   {/* 트렌드 분석 버튼 */}
                   <button

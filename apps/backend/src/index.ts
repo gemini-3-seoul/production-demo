@@ -6,7 +6,7 @@ import path from 'path';
 import { generateLandingPageHTML } from './utils/templateGenerator';
 import { uploadLandingPageToGCS, saveCardNewsAsset, getPublicUrl } from './services/storageService';
 import { getWeather } from './services/weatherService';
-import { getFoodTrends } from './services/trendsService';
+
 import { generateImage, buildCardNewsPrompt, buildHeroImagePrompt } from './services/imageGenerationService';
 
 // --- 모델 상수 분리 ---
@@ -476,17 +476,12 @@ app.post('/api/landing-pages', async (req: Request, res: Response) => {
             return;
         }
 
-        // 날씨/트렌드 데이터 병렬 조회
-        const [weatherResult, trendResult] = await Promise.all([
-            getWeather(address).catch((err) => {
-                console.warn('Weather fetch failed while creating landing page:', err);
-                return null;
-            }),
-            getFoodTrends(businessName, 'KR').catch((err) => {
-                console.warn('Trend fetch failed while creating landing page:', err);
-                return null;
-            }),
-        ]);
+        // 날씨 데이터 조회
+        const weatherResult = await getWeather(address).catch((err) => {
+            console.warn('Weather fetch failed while creating landing page:', err);
+            return null;
+        });
+        const trendResult = null;
 
         // Nano Banana 2로 히어로 이미지 생성 시도
         let heroImageUrl: string | undefined;
@@ -574,12 +569,14 @@ app.post('/api/analyze-trends', async (req: Request, res: Response) => {
     }
 
     try {
-        const { businessName, description, address } = req.body;
+        const { businessName, description, address, trendKeywords } = req.body;
 
         if (!businessName || !address) {
             res.status(400).json({ error: 'businessName and address are required' });
             return;
         }
+
+        const userTrendKeywords: string[] = Array.isArray(trendKeywords) ? trendKeywords : [];
 
         // Gemini Function Calling 설정
         const tools = [{
@@ -598,26 +595,12 @@ app.post('/api/analyze-trends', async (req: Request, res: Response) => {
                         required: ['location'],
                     },
                 },
-                {
-                    name: 'get_food_trends',
-                    description: '특정 키워드의 음식/외식 관련 트렌드를 조회합니다',
-                    parameters: {
-                        type: 'OBJECT',
-                        properties: {
-                            keyword: {
-                                type: 'STRING',
-                                description: '트렌드를 조회할 키워드 (예: 카페, 맛집)',
-                            },
-                            geo: {
-                                type: 'STRING',
-                                description: '국가 코드 (기본: KR)',
-                            },
-                        },
-                        required: ['keyword'],
-                    },
-                },
             ],
         }];
+
+        const trendKeywordsText = userTrendKeywords.length > 0
+            ? `\n현재 트렌드 키워드 (사용자 입력): ${userTrendKeywords.join(', ')}\n위 트렌드 키워드와 날씨 데이터를 기반으로 마케팅 인사이트를 분석해주세요.`
+            : '';
 
         const systemPrompt = `당신은 소상공인 마케팅 전문가입니다.
 아래 가게 정보를 바탕으로 날씨와 트렌드를 분석하여 마케팅 제안서를 작성해주세요.
@@ -626,8 +609,9 @@ app.post('/api/analyze-trends', async (req: Request, res: Response) => {
 - 상호명: ${businessName}
 - 소개: ${description || '없음'}
 - 주소: ${address}
+${trendKeywordsText}
 
-반드시 get_weather와 get_food_trends 도구를 사용하여 실시간 데이터를 수집한 후,
+반드시 get_weather 도구를 사용하여 실시간 날씨 데이터를 수집한 후,
 최종적으로 아래 JSON 형식으로만 응답해주세요:
 
 \`\`\`json
@@ -706,8 +690,6 @@ app.post('/api/analyze-trends', async (req: Request, res: Response) => {
                     try {
                         if (name === 'get_weather') {
                             functionResult = await getWeather(args.location || address);
-                        } else if (name === 'get_food_trends') {
-                            functionResult = await getFoodTrends(args.keyword || businessName, args.geo || 'KR');
                         } else {
                             functionResult = { error: `Unknown function: ${name}` };
                         }
