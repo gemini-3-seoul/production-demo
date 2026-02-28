@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import sqlite3 from 'sqlite3';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { generateLandingPageHTML } from './utils/templateGenerator';
 import { uploadLandingPageToGCS, saveCardNewsAsset, getPublicUrl, readStoredFile } from './services/storageService';
 import { getWeather } from './services/weatherService';
@@ -990,7 +991,7 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
         } else {
             // photoBase64 없음 → 기존 HTML에서 사진 추출 후 HTML 재생성
             const existing = await dbGet(
-                `SELECT file_location FROM landing_pages WHERE page_id = ?`,
+                `SELECT file_location, public_url FROM landing_pages WHERE page_id = ?`,
                 [pageId],
             );
             if (!existing) {
@@ -998,9 +999,18 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
                 return;
             }
 
+            // file_location이 비어있으면 page_id로 로컬 경로 유추
+            let fileLocation = existing.file_location;
+            if (!fileLocation) {
+                const localPath = path.join(__dirname, `../public/landing-pages/${pageId}.html`);
+                if (fs.existsSync(localPath)) {
+                    fileLocation = localPath;
+                }
+            }
+
             let extractedPhoto: string | null = null;
-            if (existing.file_location) {
-                const existingHtml = await readStoredFile(existing.file_location);
+            if (fileLocation) {
+                const existingHtml = await readStoredFile(fileLocation);
                 if (existingHtml) {
                     const imgMatch = existingHtml.match(/<img[^>]*\ssrc="(data:image\/[^"]+)"/i);
                     extractedPhoto = imgMatch ? imgMatch[1] : null;
@@ -1040,14 +1050,14 @@ app.put('/api/landing-pages/:pageId', async (req: Request, res: Response) => {
                 heroImageUrl,
             });
 
-            const { publicUrl, fileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
+            const { publicUrl, fileLocation: newFileLocation } = await uploadLandingPageToGCS(htmlContent, pageId);
             const updatedAt = new Date().toISOString();
 
             await dbRun(
                 `UPDATE landing_pages
                  SET business_name = ?, description = ?, address = ?, public_url = ?, file_location = ?, updated_at = ?
                  WHERE page_id = ?`,
-                [businessName, description, address, publicUrl, fileLocation, updatedAt, pageId],
+                [businessName, description, address, publicUrl, newFileLocation, updatedAt, pageId],
             );
 
             res.json({
