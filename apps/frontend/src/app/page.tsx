@@ -664,10 +664,30 @@ export default function Dashboard() {
   };
 
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // 미리보기에서 사진 재업로드 → photoBase64 복원
+  const handlePreviewPhotoReupload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentPreview) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const b64 = event.target?.result as string;
+      const updated = { ...currentPreview, photoBase64: b64 };
+      setSavedPages(prev => prev.map(p => p.id === currentPreview.id ? updated : p));
+      setCurrentPreview(updated);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleUploadToGCS = async (page: PageData) => {
-    if (!page.businessName || !page.photoBase64) return;
+    if (!page.businessName) return;
+    if (!page.photoBase64) {
+      setUploadError('사진이 없습니다. 아래에서 사진을 다시 업로드해주세요.');
+      return;
+    }
     setUploadStatus('uploading');
+    setUploadError(null);
 
     try {
       const res = await fetch('/api/landing-pages', {
@@ -682,7 +702,10 @@ export default function Dashboard() {
         }),
       });
 
-      if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `Server Error: ${res.status}`);
+      }
       const data = await res.json();
 
       // gcsUrl을 PageData에 저장
@@ -690,8 +713,9 @@ export default function Dashboard() {
       setSavedPages(prev => prev.map(p => p.id === page.id ? updated : p));
       setCurrentPreview(updated);
       setUploadStatus('done');
-    } catch (e) {
+    } catch (e: any) {
       console.error('GCS upload error:', e);
+      setUploadError(e.message || '업로드 중 오류가 발생했습니다.');
       setUploadStatus('error');
     }
   };
@@ -912,10 +936,27 @@ export default function Dashboard() {
                     {uploadStatus === 'uploading' ? '⏳ 업로드 중...' : '🚀 웹에 배포하기'}
                   </button>
                 ) : null}
-                {uploadStatus === 'error' && (
-                  <span className="upload-error">업로드 실패. 다시 시도해주세요.</span>
-                )}
               </div>
+              {/* 에러 메시지 */}
+              {uploadError && (
+                <div style={{ color: '#dc2626', padding: '10px 14px', background: '#fef2f2', borderRadius: '8px', marginTop: '8px', border: '1px solid #fecaca', fontSize: '0.9rem' }}>
+                  {uploadError}
+                </div>
+              )}
+              {/* 사진 재업로드 (photoBase64 없을 때) */}
+              {!currentPreview.gcsUrl && currentPreview.businessName && !currentPreview.photoBase64 && (
+                <div style={{ marginTop: '10px', padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#92400e', marginBottom: '8px' }}>
+                    페이지 새로고침으로 사진 데이터가 사라졌습니다. 사진을 다시 선택해주세요.
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePreviewPhotoReupload}
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+              )}
             </div>
             <div className="iframe-wrapper">
               <iframe srcDoc={currentPreview.html} title="landing page preview" />
