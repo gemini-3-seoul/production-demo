@@ -42,8 +42,8 @@ export async function uploadLandingPageToGCS(
         },
     });
 
-    // 파일을 public으로 설정
-    await file.makePublic();
+    // Note: Uniform bucket-level access를 사용하므로 개별 파일의 makePublic() 호출 불필요
+    // 버킷 레벨에서 allUsers에게 Storage Object Viewer 권한을 부여하면 모든 파일이 public됨
 
     // Public URL 생성
     const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
