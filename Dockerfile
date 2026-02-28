@@ -27,7 +27,7 @@ RUN npm run build -w apps/frontend
 # Expose port (Cloud Run sets PORT to 8080 by default)
 ENV PORT=8080
 ENV API_PORT=8081
-ENV GEMINI_API_KEY=AIzaSyANRCkBNvbuxxSvEaQZzjOsEqj3mDODt20
+ENV GEMINI_API_KEY=AIzaSyBD8sIuv-KZWh45eMCuBvWu11bjGvwB1QU
 EXPOSE 8080 8081
 
 # Run the wrapper script that spawns both apps
