@@ -62,6 +62,7 @@ export default function CardNewsPage() {
   const [loadingCards, setLoadingCards] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState<string>("");
+  const [generatingProgress, setGeneratingProgress] = useState<string>("");
   const [copyText, setCopyText] = useState("");
   const [error, setError] = useState("");
 
@@ -135,6 +136,7 @@ export default function CardNewsPage() {
     setIsGenerating(true);
     setError("");
     setStatus("");
+    setGeneratingProgress(`AI 이미지 생성 중... (${imageCount}장)`);
     try {
       const res = await fetch("/api/card-news", {
         method: "POST",
@@ -156,6 +158,7 @@ export default function CardNewsPage() {
       setError(e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
       setIsGenerating(false);
+      setGeneratingProgress("");
     }
   };
 
@@ -251,8 +254,17 @@ export default function CardNewsPage() {
                   disabled={isGenerating || !selectedPageId}
                   className="w-full rounded-md bg-gradient-to-r from-[#a78bfa] to-[#ec4899] text-white disabled:opacity-60 py-2"
                 >
-                  {isGenerating ? "생성 중..." : "오늘 카드뉴스 생성"}
+                  {isGenerating ? "AI 이미지 생성 중..." : "오늘 카드뉴스 생성"}
                 </button>
+                {isGenerating && generatingProgress && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-[#7c3aed]">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    {generatingProgress}
+                  </div>
+                )}
                 {selectedPage && (
                   <div className="mt-4 text-sm text-[#6b7280]">
                     <p>
@@ -293,7 +305,7 @@ export default function CardNewsPage() {
                         <a
                           key={img.fileLocation}
                           href={img.url}
-                          download={`card-news-${item.pageId}-${item.cardDate}-${img.order}.svg`}
+                          download={`card-news-${item.pageId}-${item.cardDate}-${img.order}.png`}
                           target="_blank"
                           rel="noreferrer"
                           className="relative block rounded border border-[#e5e7eb] overflow-hidden"

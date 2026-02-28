@@ -21,15 +21,16 @@ export interface LandingPageData {
     address: string;
     photoBase64: string; // data:image/...;base64,xxx 형식
     imageAnalysis?: ImageAnalysis;
+    heroImageUrl?: string; // AI 생성 히어로 이미지 URL (base64 data URI 또는 공개 URL)
 }
 
 export function generateLandingPageHTML(data: LandingPageData): string {
-    const { businessName, description, address, photoBase64, imageAnalysis } = data;
+    const { businessName, description, address, photoBase64, imageAnalysis, heroImageUrl } = data;
     const encodedAddress = encodeURIComponent(address);
     const currentYear = new Date().getFullYear();
 
     if (imageAnalysis) {
-        return generateEnhancedHTML(businessName, description, address, photoBase64, encodedAddress, currentYear, imageAnalysis);
+        return generateEnhancedHTML(businessName, description, address, photoBase64, encodedAddress, currentYear, imageAnalysis, heroImageUrl);
     }
 
     return `<!DOCTYPE html>
@@ -212,7 +213,8 @@ function generateEnhancedHTML(
     photoBase64: string,
     encodedAddress: string,
     currentYear: number,
-    analysis: ImageAnalysis
+    analysis: ImageAnalysis,
+    heroImageUrl?: string,
 ): string {
     const { atmosphere, menuFeatures, colorScheme, enhancedDescription, tags } = analysis;
     const primaryColor = colorScheme?.primary || '#4CAF50';
@@ -234,6 +236,12 @@ function generateEnhancedHTML(
             </div>`
         : '';
 
+    // 히어로 이미지: AI 생성 이미지가 있으면 사용, 없으면 원본 사진 + 그라디언트 배경
+    const heroImgSrc = heroImageUrl || photoBase64;
+    const heroStyle = heroImageUrl
+        ? '.hero { width: 100%; height: 450px; position: relative; overflow: hidden; }'
+        : `.hero { width: 100%; height: 450px; position: relative; overflow: hidden; background: linear-gradient(135deg, ${primaryColor}, ${secondaryColor}); }`;
+
     return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -254,7 +262,7 @@ function generateEnhancedHTML(
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-main); line-height: 1.6; -webkit-font-smoothing: antialiased; }
-        .hero { width: 100%; height: 450px; position: relative; overflow: hidden; }
+        ${heroStyle}
         .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .hero-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.75)); padding: 50px 20px 25px; color: white; text-align: center; }
         .hero-overlay h1 { font-size: 2.8rem; text-shadow: 2px 2px 8px rgba(0,0,0,0.6); margin-bottom: 8px; }
@@ -286,7 +294,7 @@ function generateEnhancedHTML(
 </head>
 <body>
     <div class="hero">
-        <img src="${photoBase64}" alt="${businessName} 매장 사진">
+        <img src="${heroImgSrc}" alt="${businessName} 매장 사진">
         <div class="hero-overlay">
             <h1>${businessName}</h1>
             ${atmosphereBadges}

@@ -1,77 +1,184 @@
 /**
- * Google Cloud Storage 업로드 서비스
+ * 랜딩페이지 저장 서비스
+ * - GCS_BUCKET_NAME 설정 시: Google Cloud Storage 업로드
+ * - 미설정 시: 로컬 파일 저장 (데모)
  */
 
-import { Storage } from '@google-cloud/storage';
 import { nanoid } from 'nanoid';
+import fs from 'fs';
+import path from 'path';
 
-// GCS 클라이언트 초기화
-const storage = new Storage();
+const PUBLIC_DIR = path.join(__dirname, '../../public');
+const API_PORT = process.env.API_PORT || 8081;
+const BACKEND_PUBLIC_BASE_URL = process.env.BACKEND_PUBLIC_BASE_URL || `http://localhost:${API_PORT}`;
+
+const getBucketName = () => process.env.GCS_BUCKET_NAME;
 
 export interface UploadResult {
     pageId: string;
     publicUrl: string;
+    fileLocation: string;
+}
+
+export interface SavedFileResult {
+    fileLocation: string;
+    publicUrl: string;
 }
 
 /**
- * HTML 파일을 GCS에 업로드하고 public URL 반환
- * @param htmlContent - 업로드할 HTML 내용
- * @param existingPageId - 기존 페이지 ID (업데이트 시 같은 경로 덮어쓰기)
- * @returns pageId와 public URL
+ * 랜딩페이지 저장
  */
 export async function uploadLandingPageToGCS(
     htmlContent: string,
-    existingPageId?: string
+    existingPageId?: string,
 ): Promise<UploadResult> {
-    const bucketName = process.env.GCS_BUCKET_NAME;
-
-    if (!bucketName) {
-        throw new Error('GCS_BUCKET_NAME environment variable is not set');
-    }
-
-    // 기존 pageId가 있으면 재사용, 없으면 새로 생성
     const pageId = existingPageId || nanoid(10);
     const fileName = `landing-pages/${pageId}.html`;
-
-    const bucket = storage.bucket(bucketName);
-    const file = bucket.file(fileName);
-
-    // 업데이트 시 캐시 무효화, 신규 시 1시간 캐시
     const cacheControl = existingPageId
         ? 'no-cache, max-age=0'
         : 'public, max-age=3600';
 
-    // HTML 파일 업로드
-    await file.save(htmlContent, {
-        contentType: 'text/html; charset=utf-8',
-        metadata: {
-            cacheControl,
-        },
-    });
-
-    // Public URL 생성
-    const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+    const result = await saveTextFile(fileName, htmlContent, 'text/html; charset=utf-8', cacheControl);
 
     return {
         pageId,
-        publicUrl,
+        publicUrl: result.publicUrl,
+        fileLocation: result.fileLocation,
     };
 }
 
 /**
- * 특정 랜딩페이지 삭제 (선택사항)
- * @param pageId - 삭제할 페이지 ID
+ * 카드뉴스 에셋 저장 (텍스트 또는 바이너리)
  */
-export async function deleteLandingPage(pageId: string): Promise<void> {
-    const bucketName = process.env.GCS_BUCKET_NAME;
+export async function saveCardNewsAsset(
+    pageId: string,
+    fileName: string,
+    content: string | Buffer,
+    options: { contentType?: string; cacheControl?: string } = {},
+): Promise<SavedFileResult> {
+    const key = `card-news/${pageId}/${fileName}`;
+    const cacheControl = options.cacheControl || 'public, max-age=3600';
 
-    if (!bucketName) {
-        throw new Error('GCS_BUCKET_NAME environment variable is not set');
+    if (Buffer.isBuffer(content)) {
+        const contentType = options.contentType || 'image/png';
+        return saveBinaryFile(key, content, contentType, cacheControl);
     }
 
-    const fileName = `landing-pages/${pageId}.html`;
-    const bucket = storage.bucket(bucketName);
-    const file = bucket.file(fileName);
+    const contentType = options.contentType || 'image/svg+xml; charset=utf-8';
+    return saveTextFile(key, content, contentType, cacheControl);
+}
 
-    await file.delete();
+/**
+ * 바이너리 파일 저장 (PNG 등)
+ */
+export async function saveBinaryFile(
+    filePath: string,
+    buffer: Buffer,
+    contentType: string,
+    cacheControl: string = 'public, max-age=3600',
+): Promise<SavedFileResult> {
+    const bucketName = getBucketName();
+
+    if (bucketName) {
+        const { Storage } = await import('@google-cloud/storage');
+        const storage = new Storage();
+        const bucket = storage.bucket(bucketName);
+        const file = bucket.file(filePath);
+        await file.save(buffer, {
+            contentType,
+            metadata: { cacheControl },
+        });
+        return {
+            fileLocation: `gs://${bucketName}/${filePath}`,
+            publicUrl: `https://storage.googleapis.com/${bucketName}/${filePath}`,
+        };
+    }
+
+    // 로컬 저장
+    const absolutePath = path.join(PUBLIC_DIR, filePath);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.writeFileSync(absolutePath, buffer);
+    const relativePath = path.relative(PUBLIC_DIR, absolutePath).split(path.sep).join('/');
+    return {
+        fileLocation: absolutePath,
+        publicUrl: `${BACKEND_PUBLIC_BASE_URL.replace(/\/$/, '')}/${relativePath}`,
+    };
+}
+
+/**
+ * 지정된 키 경로에 텍스트 파일 저장
+ */
+async function saveTextFile(
+    filePath: string,
+    content: string,
+    contentType: string,
+    cacheControl: string,
+): Promise<SavedFileResult> {
+    const bucketName = getBucketName();
+
+    if (bucketName) {
+        const { Storage } = await import('@google-cloud/storage');
+        const storage = new Storage();
+        const bucket = storage.bucket(bucketName);
+        const file = bucket.file(filePath);
+        await file.save(content, {
+            contentType,
+            metadata: { cacheControl },
+        });
+        return {
+            fileLocation: `gs://${bucketName}/${filePath}`,
+            publicUrl: `https://storage.googleapis.com/${bucketName}/${filePath}`,
+        };
+    }
+
+    // 로컬 저장
+    const absolutePath = path.join(PUBLIC_DIR, filePath);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+    fs.writeFileSync(absolutePath, content, 'utf-8');
+    const relativePath = path.relative(PUBLIC_DIR, absolutePath).split(path.sep).join('/');
+    return {
+        fileLocation: absolutePath,
+        publicUrl: `${BACKEND_PUBLIC_BASE_URL.replace(/\/$/, '')}/${relativePath}`,
+    };
+}
+
+/**
+ * fileLocation 기반으로 공개 URL 생성
+ */
+export function getPublicUrl(fileLocation: string): string {
+    if (fileLocation.startsWith('gs://')) {
+        const pathWithoutScheme = fileLocation.replace('gs://', '');
+        const firstSlash = pathWithoutScheme.indexOf('/');
+        if (firstSlash === -1) return '';
+        const bucketName = pathWithoutScheme.slice(0, firstSlash);
+        const objectPath = pathWithoutScheme.slice(firstSlash + 1);
+        return `https://storage.googleapis.com/${bucketName}/${objectPath}`;
+    }
+
+    // Local file path
+    const relativePath = path.relative(PUBLIC_DIR, path.resolve(fileLocation)).split(path.sep).join('/');
+    if (relativePath.startsWith('..')) return '';
+    return `${BACKEND_PUBLIC_BASE_URL.replace(/\/$/, '')}/${relativePath}`;
+}
+
+/**
+ * 저장된 파일 삭제
+ */
+export async function deleteStoredFile(fileLocation: string): Promise<void> {
+    if (fileLocation.startsWith('gs://')) {
+        const bucketName = getBucketName();
+        if (!bucketName) return;
+        const pathWithoutScheme = fileLocation.replace('gs://', '');
+        const firstSlash = pathWithoutScheme.indexOf('/');
+        if (firstSlash === -1) return;
+        const fileName = pathWithoutScheme.slice(firstSlash + 1);
+        const { Storage } = await import('@google-cloud/storage');
+        const storage = new Storage();
+        await storage.bucket(bucketName).file(fileName).delete();
+        return;
+    }
+
+    if (fs.existsSync(fileLocation)) {
+        fs.unlinkSync(fileLocation);
+    }
 }
