@@ -34,6 +34,24 @@ interface ChatMessage {
   isHtml?: boolean;
 }
 
+interface TrendProposal {
+  weather: {
+    temperature: string;
+    description: string;
+    marketingInsight: string;
+  };
+  trends: {
+    topKeywords: string[];
+    insight: string;
+  };
+  proposal: {
+    enhancedDescription: string;
+    newTags: string[];
+    newFeatures: string[];
+    reasoning: string;
+  };
+}
+
 // Format Date Utility
 const formatDate = (date: Date) => {
   const yy = String(date.getFullYear()).slice(-2);
@@ -290,6 +308,13 @@ export default function Dashboard() {
   const [genFile, setGenFile] = useState<File | null>(null);
   const [genStatus, setGenStatus] = useState<'idle' | 'generating' | 'success'>('idle');
 
+  // Edit View State
+  const [editSelectedPage, setEditSelectedPage] = useState<PageData | null>(null);
+  const [trendProposal, setTrendProposal] = useState<TrendProposal | null>(null);
+  const [isAnalyzingTrends, setIsAnalyzingTrends] = useState(false);
+  const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   // Load from local storage on mount
   useEffect(() => {
     const saved = localStorage.getItem('bizPages');
@@ -526,6 +551,99 @@ export default function Dashboard() {
     reader.readAsDataURL(genFile);
   };
 
+  // Trend Analysis Handler
+  const handleAnalyzeTrends = async () => {
+    if (!editSelectedPage) return;
+    setIsAnalyzingTrends(true);
+    setEditError(null);
+    setTrendProposal(null);
+
+    try {
+      const res = await fetch('/api/analyze-trends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: editSelectedPage.businessName,
+          description: editSelectedPage.description,
+          address: editSelectedPage.address,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+      const data = await res.json();
+
+      if (data.success && data.proposal) {
+        setTrendProposal(data.proposal);
+      } else {
+        setEditError('분석 결과를 파싱할 수 없습니다.');
+      }
+    } catch (e) {
+      console.error('Analyze trends error:', e);
+      setEditError('트렌드 분석 중 오류가 발생했습니다. 백엔드 서버를 확인해주세요.');
+    } finally {
+      setIsAnalyzingTrends(false);
+    }
+  };
+
+  // Apply Proposal Handler
+  const handleApplyProposal = async () => {
+    if (!editSelectedPage || !trendProposal || !editSelectedPage.gcsUrl) return;
+    setIsApplyingChanges(true);
+    setEditError(null);
+
+    try {
+      // gcsUrl에서 pageId 추출: .../landing-pages/{pageId}.html
+      const urlParts = editSelectedPage.gcsUrl.split('/');
+      const filename = urlParts[urlParts.length - 1]; // pageId.html
+      const pageId = filename.replace('.html', '');
+
+      const updatedAnalysis: ImageAnalysis = {
+        atmosphere: editSelectedPage.imageAnalysis?.atmosphere || [],
+        menuFeatures: trendProposal.proposal.newFeatures,
+        colorScheme: editSelectedPage.imageAnalysis?.colorScheme || {
+          primary: '#4CAF50',
+          secondary: '#2196F3',
+          accent: '#FF9800',
+        },
+        enhancedDescription: trendProposal.proposal.enhancedDescription,
+        tags: trendProposal.proposal.newTags,
+      };
+
+      const res = await fetch(`/api/landing-pages/${pageId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: editSelectedPage.businessName,
+          description: trendProposal.proposal.enhancedDescription,
+          address: editSelectedPage.address,
+          photoBase64: editSelectedPage.photoBase64,
+          imageAnalysis: updatedAnalysis,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Server Error: ${res.status}`);
+      const data = await res.json();
+
+      // localStorage 업데이트
+      const updatedPage: PageData = {
+        ...editSelectedPage,
+        description: trendProposal.proposal.enhancedDescription,
+        imageAnalysis: updatedAnalysis,
+        gcsUrl: data.url,
+      };
+
+      setSavedPages(prev => prev.map(p => p.id === editSelectedPage.id ? updatedPage : p));
+      setEditSelectedPage(updatedPage);
+      setTrendProposal(null);
+      alert('페이지가 성공적으로 업데이트되었습니다!');
+    } catch (e) {
+      console.error('Apply proposal error:', e);
+      setEditError('페이지 업데이트 중 오류가 발생했습니다.');
+    } finally {
+      setIsApplyingChanges(false);
+    }
+  };
+
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
 
   const handleUploadToGCS = async (page: PageData) => {
@@ -571,13 +689,19 @@ export default function Dashboard() {
             className={`nav-btn ${activeView === 'view-chat' ? 'active' : ''}`}
             onClick={() => setActiveView('view-chat')}
           >
-            💬 AI chat
+            📝 내 페이지 생성
           </button>
           <button
             className={`nav-btn ${activeView === 'view-generator' ? 'active' : ''}`}
             onClick={() => { setActiveView('view-generator'); setGenStatus('idle'); }}
           >
             ✨ 가게소개페이지 만들기
+          </button>
+          <button
+            className={`nav-btn ${activeView === 'view-edit' ? 'active' : ''}`}
+            onClick={() => { setActiveView('view-edit'); setTrendProposal(null); setEditError(null); }}
+          >
+            🔄 내 페이지 수정
           </button>
 
           <div className="nav-section">
@@ -749,6 +873,147 @@ export default function Dashboard() {
             </div>
             <div className="iframe-wrapper">
               <iframe srcDoc={currentPreview.html} title="landing page preview" />
+            </div>
+          </section>
+        )}
+
+        {/* Edit View */}
+        {activeView === 'view-edit' && (
+          <section className="view-section active">
+            <div className="edit-container">
+              <h2>🔄 내 페이지 수정</h2>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
+                배포된 페이지를 선택하고 트렌드 분석을 통해 업데이트하세요.
+              </p>
+
+              {/* 배포된 페이지 선택 드롭다운 */}
+              <select
+                className="edit-select"
+                value={editSelectedPage?.id || ''}
+                onChange={(e) => {
+                  const page = savedPages.find(p => p.id === e.target.value);
+                  setEditSelectedPage(page || null);
+                  setTrendProposal(null);
+                  setEditError(null);
+                }}
+              >
+                <option value="">배포된 페이지를 선택하세요</option>
+                {savedPages.filter(p => p.gcsUrl).map(page => (
+                  <option key={page.id} value={page.id}>
+                    {page.businessName || page.filename}
+                  </option>
+                ))}
+              </select>
+
+              {/* 선택된 페이지 미리보기 */}
+              {editSelectedPage && (
+                <>
+                  <div className="edit-preview-frame">
+                    <iframe
+                      srcDoc={editSelectedPage.html}
+                      title="edit preview"
+                      style={{ width: '100%', height: '250px', border: 'none', borderRadius: '8px' }}
+                    />
+                  </div>
+
+                  {editSelectedPage.gcsUrl && (
+                    <a
+                      href={editSelectedPage.gcsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#a5b4fc', fontSize: '0.85rem', display: 'block', marginBottom: '16px' }}
+                    >
+                      🌐 현재 배포 URL: {editSelectedPage.gcsUrl}
+                    </a>
+                  )}
+
+                  {/* 트렌드 분석 버튼 */}
+                  <button
+                    className="generate-btn"
+                    onClick={handleAnalyzeTrends}
+                    disabled={isAnalyzingTrends}
+                    style={{ marginBottom: '24px' }}
+                  >
+                    {isAnalyzingTrends ? '⏳ 트렌드 분석 중...' : '📊 트렌드 분석하기'}
+                  </button>
+
+                  {/* 에러 메시지 */}
+                  {editError && (
+                    <div style={{ color: '#f87171', padding: '12px', background: 'rgba(248,113,113,0.1)', borderRadius: '8px', marginBottom: '16px' }}>
+                      ❌ {editError}
+                    </div>
+                  )}
+
+                  {/* 제안 카드 */}
+                  {trendProposal && (
+                    <div className="proposal-cards">
+                      {/* 날씨 카드 */}
+                      <div className="proposal-card">
+                        <div className="proposal-section-title">🌤️ 날씨 분석</div>
+                        <div className="proposal-section">
+                          <p><strong>기온:</strong> {trendProposal.weather.temperature}</p>
+                          <p><strong>상태:</strong> {trendProposal.weather.description}</p>
+                          <p className="proposal-insight">{trendProposal.weather.marketingInsight}</p>
+                        </div>
+                      </div>
+
+                      {/* 트렌드 카드 */}
+                      <div className="proposal-card">
+                        <div className="proposal-section-title">📈 트렌드 분석</div>
+                        <div className="proposal-section">
+                          <div className="proposal-keywords">
+                            {trendProposal.trends.topKeywords.map((kw, i) => (
+                              <span key={i} className="proposal-keyword">{kw}</span>
+                            ))}
+                          </div>
+                          <p className="proposal-insight">{trendProposal.trends.insight}</p>
+                        </div>
+                      </div>
+
+                      {/* 수정 제안 카드 */}
+                      <div className="proposal-card proposal-card-highlight">
+                        <div className="proposal-section-title">✨ 수정 제안</div>
+                        <div className="proposal-section">
+                          <p><strong>새 소개문구:</strong></p>
+                          <p style={{ marginBottom: '12px', lineHeight: 1.7 }}>{trendProposal.proposal.enhancedDescription}</p>
+                          <p><strong>새 태그:</strong></p>
+                          <div className="proposal-tags">
+                            {trendProposal.proposal.newTags.map((tag, i) => (
+                              <span key={i} className="proposal-tag">{tag}</span>
+                            ))}
+                          </div>
+                          <p><strong>새 특장점:</strong></p>
+                          <ul style={{ paddingLeft: '20px', marginBottom: '12px' }}>
+                            {trendProposal.proposal.newFeatures.map((f, i) => (
+                              <li key={i} style={{ marginBottom: '4px' }}>{f}</li>
+                            ))}
+                          </ul>
+                          <p className="proposal-insight">{trendProposal.proposal.reasoning}</p>
+                        </div>
+                      </div>
+
+                      {/* 액션 버튼 */}
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                        <button
+                          className="generate-btn"
+                          onClick={handleApplyProposal}
+                          disabled={isApplyingChanges}
+                          style={{ flex: 1 }}
+                        >
+                          {isApplyingChanges ? '⏳ 반영 중...' : '✅ 반영하기'}
+                        </button>
+                        <button
+                          className="secondary-btn"
+                          onClick={() => setTrendProposal(null)}
+                          style={{ flex: 0.5 }}
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </section>
         )}
